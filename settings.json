@@ -1,0 +1,19 @@
+{
+    "network_functions": [
+        "AMF",
+        "SMF",
+        "UPF",
+        "PCF",
+        "AUSF",
+        "UDM",
+        "AF",
+        "NEF",
+        "NRF",
+        "NSSF"
+    ],
+    "scan_interval_minutes": 1,
+    "kafka_config": {
+        "bootstrap.servers": "127.0.0.1:9092"
+    },
+    "kafka_topic": "quickstart-events"
+}

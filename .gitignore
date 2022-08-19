@@ -1,0 +1,8 @@
+/__pycache__
+
+/.dockerignore
+
+/test_namespaces.yml
+
+/*.json
+!/settings.json
