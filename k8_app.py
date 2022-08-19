@@ -1,15 +1,8 @@
 from datetime import datetime
 import generate_logs
-import json
 from kubernetes import client, config
 from kubernetes.client import CoreV1Api
-import requests
 import time
-from typing import List
-
-
-def upload_to_kafka(logs:List[str]):
-    requests.post("http://localhost:8082/topics/myLogs", json={"records":[{"value":logs}]}, headers={"Content-Type": "application/vnd.kafka.json.v2+json"})
 
 
 def run(coreAPI:CoreV1Api):
@@ -40,9 +33,11 @@ def run(coreAPI:CoreV1Api):
             with open("logs.json", 'r') as file:
                 print(file.read())
             # If there are changes, then upload the changes to the kafka topic
-            print("\n--------------UPLOADING TO KAFKA TOPIC----------------")
-            logs = json.load(file)
-            upload_to_kafka(logs["logs"])
+            print("\nuploading logs to kafka...")
+            response = generate_logs.upload_to_kafka(settings["kafka_config"]["api_ip"], settings["kafka_config"]["topic"])
+            # print(response.status_code)
+            # print(response.content)
+            print("successfully uploaded logs to kafka")
         
         # If no logs.json file, means no logs were needed/generated for this scan
         except FileNotFoundError:

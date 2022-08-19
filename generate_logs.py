@@ -8,14 +8,13 @@ from typing import List
 
 
 def import_settings(settings_path:str):
-    with open(settings_path, 'r') as settings:
-        return json.load(settings)
+    return json.load(open(settings_path, 'r'))
 
 
-def get_current_namespaces():
+def get_current_nfs():
     results = subprocess.run(["kubectl", "get", "namespaces"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if results.stderr is None or results.stderr == "":
-        current_namespaces = []
+        current_nfs = []
         for line in results.stdout.split("\n"):
             # Discard empty strings
             if(line == ""):
@@ -25,9 +24,9 @@ def get_current_namespaces():
             info = line.split()
             name = info[0]
 
-            current_namespaces.append(name)
+            current_nfs.append(name)
         
-        return current_namespaces
+        return current_nfs
     else:
         print(results.stderr)
         return None
@@ -45,14 +44,14 @@ def scan_for_nfs(namespaces:List[str], network_functions:List[str]):
         if len(applicable_nfs) > 0:
             current_nfs.append({"kind":applicable_nfs, "namespace":name})
 
-    out = {"timestamp":datetime.now().isoformat(), "record":current_nfs}
-    with open("current_namespaces.json", 'w') as file:
+    out = {"timestamp":datetime.now().isoformat(), "network_functions":current_nfs}
+    with open("current_nfs.json", 'w') as file:
         json.dump(out, file, indent=2)
 
 
 def save_previous_nfs():
     try:
-        results = subprocess.run(["cp", "current_namespaces.json", "previous_namespaces.json"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        results = subprocess.run(["cp", "current_nfs.json", "previous_nfs.json"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if(results.stderr is not None and results.stderr != ""):
             print(results.stderr)
     except:
@@ -61,30 +60,28 @@ def save_previous_nfs():
 
 def diff():
     try:
-        current_namespaces = []
-        with open("current_namespaces.json", 'r') as current:
-            current_nfs = json.load(current)
-            for namespace in current_nfs["record"]:
-                current_namespaces.append(namespace["namespace"])
+        current_nfs = []
+        temp = json.load(open("current_nfs.json", 'r'))
+        for namespace in temp["network_functions"]:
+            current_nfs.append(namespace["namespace"])
     except:
         # Can't find the file
         current_nfs = None
-        current_namespaces = []
+        current_nfs = []
     try:
-        previous_namespaces = []
-        with open("previous_namespaces.json", 'r') as previous:
-            previous_nfs = json.load(previous)
-            for namespace in previous_nfs["record"]:
-                previous_namespaces.append(namespace["namespace"])
+        previous_nfs = []
+        temp = json.load(open("previous_nfs.json", 'r'))
+        for namespace in temp["network_functions"]:
+            previous_nfs.append(namespace["namespace"])
     except:
         # Can't find the file
         previous_nfs = None
-        previous_namespaces = []
+        previous_nfs = []
     
     logs = []
     # Compare current and previous namespaces
-    added = set(current_namespaces).difference(previous_namespaces)
-    removed = set(previous_namespaces).difference(current_namespaces)
+    added = set(current_nfs).difference(previous_nfs)
+    removed = set(previous_nfs).difference(current_nfs)
     for i in added:
         logs.append(f"network function with namespace '{i}' was added")
     for i in removed:
@@ -92,9 +89,7 @@ def diff():
 
     # Write the logs to a json file
     if len(logs) > 0:
-        out = {"timestamp":datetime.now().isoformat(), "logs":logs}
-        with open("logs.json", 'w') as log_file:
-            json.dump(out, log_file, indent=2)
+        json.dump(logs, open("logs.json", 'w'), indent=2)
     
     # Remove the logs file if there are none
     else:
@@ -102,8 +97,13 @@ def diff():
             os.remove("logs.json")
 
 
-def upload_to_kafka(logs:List[str]):
-    requests.post("http://localhost:8082/topics/myLogs", json={"records":[{"value":logs}]}, headers={"Content-Type": "application/vnd.kafka.json.v2+json"})
+def upload_to_kafka(ip:str, topic:str):
+    logs = json.load(open("logs.json", 'r'))
+    payload = json.load(open("current_nfs.json", 'r'))
+    payload["changes"] = logs
+    print(json.dumps(payload, indent=2))
+    response = requests.post(f"http://{ip}:8082/topics/{topic}", json={"records":[{"value":payload}]}, headers={"Content-Type": "application/vnd.kafka.json.v2+json"})
+    return response
 
 
 def run_local():
@@ -113,8 +113,8 @@ def run_local():
         save_previous_nfs()
 
         print("\n-----------------------CURRENT NETWORK FUNCTIONS-----------------------")
-        scan_for_nfs(get_current_namespaces(), settings["network_functions"])
-        with open("current_namespaces.json", 'r') as file:
+        scan_for_nfs(get_current_nfs(), settings["network_functions"])
+        with open("current_nfs.json", 'r') as file:
             print(file.read())
 
         print("\n-------------------------------LOGS----------------------------------")
@@ -122,9 +122,10 @@ def run_local():
         try:
             with open("logs.json", 'r') as file:
                 print(file.read())
-                print("\nuploading logs to kafka...")
-                upload_to_kafka(json.load(file))
-                print("successfully uploaded logs to kafka")
+                
+            print("\nuploading logs to kafka...")
+            upload_to_kafka(settings["kafka_config"]["api_ip"], settings["kafka_config"]["topic"])
+            print("successfully uploaded logs to kafka")
 
         except FileNotFoundError:
             print("No changes since last update")
