@@ -11,7 +11,7 @@ def import_settings(settings_path:str):
     return json.load(open(settings_path, 'r'))
 
 
-def get_current_nfs():
+def get_current_nfs(debug:bool = False):
     results = subprocess.run(["kubectl", "get", "namespaces"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if results.stderr is None or results.stderr == "":
         current_nfs = []
@@ -27,12 +27,12 @@ def get_current_nfs():
             current_nfs.append(name)
         
         return current_nfs
-    else:
+    elif debug:
         print(results.stderr)
         return None
 
 
-def scan_for_nfs(namespaces:List[str], network_functions:List[str]):
+def scan_for_nfs(namespaces:List[str], network_functions:List[str], debug:bool = False):
     current_nfs = []
     for name in namespaces:
         applicable_nfs = []
@@ -45,20 +45,22 @@ def scan_for_nfs(namespaces:List[str], network_functions:List[str]):
             current_nfs.append({"kind":applicable_nfs, "namespace":name})
 
     out = {"timestamp":datetime.now().isoformat(), "network_functions":current_nfs}
-    with open("current_nfs.json", 'w') as file:
-        json.dump(out, file, indent=2)
+    json.dump(out, open("current_nfs.json", 'w'), indent=2)
+    if debug:
+        print(json.dumps(out, indent=2))
 
 
-def save_previous_nfs():
+def save_previous_nfs(debug:bool = False):
     try:
         results = subprocess.run(["cp", "current_nfs.json", "previous_nfs.json"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if(results.stderr is not None and results.stderr != ""):
+        if(results.stderr is not None and results.stderr != "" and debug):
             print(results.stderr)
     except:
+        # If there's nothing to copy, that's ok
         pass
 
 
-def diff():
+def diff(debug:bool = False):
     try:
         current_nfs = []
         temp = json.load(open("current_nfs.json", 'r'))
@@ -90,54 +92,14 @@ def diff():
     # Write the logs to a json file
     if len(logs) > 0:
         json.dump(logs, open("logs.json", 'w'), indent=2)
+        if debug:
+            print(json.dumps(logs, indent=2))
+        return True
     
     # Remove the logs file if there are none
     else:
         if os.path.exists("logs.json"):
             os.remove("logs.json")
-
-
-def upload_to_kafka(ip:str, topic:str):
-    logs = json.load(open("logs.json", 'r'))
-    payload = json.load(open("current_nfs.json", 'r'))
-    payload["changes"] = logs
-    # print(json.dumps(payload, indent=2))
-    response = requests.get(f"http://{ip}:8082/topics/{topic}")
-    print(json.dumps(response.json(), indent=2))
-    response = requests.post(f"http://{ip}:8082/topics/{topic}", json={"records":[{"value":payload, "partition":0}]}, headers={"Content-Type": "application/vnd.kafka.json.v2+json"})
-    return response
-
-
-def run_local():
-    while True:
-        print("-----------------------------SCAN BEGAN AT {}------------------------------".format(datetime.now().isoformat()))
-        settings = import_settings("settings.json")
-        save_previous_nfs()
-
-        print("\n-----------------------CURRENT NETWORK FUNCTIONS-----------------------")
-        scan_for_nfs(get_current_nfs(), settings["network_functions"])
-        with open("current_nfs.json", 'r') as file:
-            print(file.read())
-
-        print("\n-------------------------------LOGS----------------------------------")
-        diff()
-        try:
-            with open("logs.json", 'r') as file:
-                print(file.read())
-                
-            print("\nuploading logs to kafka...")
-            upload_to_kafka(settings["kafka_config"]["api_ip"], settings["kafka_config"]["topic"])
-            print("successfully uploaded logs to kafka")
-
-        except FileNotFoundError:
+        if debug:
             print("No changes since last update")
-
-        print("\n------------------------------SCAN COMPLETE---------------------------\n\n\n")
-
-        time.sleep(settings["scan_interval_minutes"]*60)
-
-
-
-# MAIN
-if __name__ == "__main__":
-    run_local()
+        return False
