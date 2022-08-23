@@ -1,0 +1,13 @@
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+kowl:
+  config:
+    kafka:
+      brokers:
+        - kafka.confluent.svc.cluster.local

@@ -1,0 +1,4 @@
+*.json
+!settings.json
+
+**/*.yml

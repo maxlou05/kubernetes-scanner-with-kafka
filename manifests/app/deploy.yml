@@ -4,6 +4,7 @@ metadata:
   name: network-function-info-collector
   labels:
     app: network-function-info-collector
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -16,4 +17,4 @@ spec:
     spec:
       containers:
       - name: scanner
-        image: maxlou05/network_function_info_collector:v1.11
+        image: maxlou05/network_function_info_collector:v2.15

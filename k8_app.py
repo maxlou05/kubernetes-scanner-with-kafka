@@ -2,7 +2,9 @@ from datetime import datetime
 import generate_logs
 from kubernetes import client, config
 from kubernetes.client import CoreV1Api
+import requests
 import time
+import json
 
 
 def run(coreAPI:CoreV1Api):
@@ -35,8 +37,8 @@ def run(coreAPI:CoreV1Api):
             # If there are changes, then upload the changes to the kafka topic
             print("\nuploading logs to kafka...")
             response = generate_logs.upload_to_kafka(settings["kafka_config"]["api_ip"], settings["kafka_config"]["topic"])
-            # print(response.status_code)
-            # print(response.content)
+            print(response.status_code)
+            print(json.dumps(response.json(), indent=2))
             print("successfully uploaded logs to kafka")
         
         # If no logs.json file, means no logs were needed/generated for this scan
@@ -56,6 +58,25 @@ print("config is loaded")
 
 v1 = client.CoreV1Api()
 print("client is created, starting scan")
+
+# Create a topic
+print("checking if topic exists")
+settings = generate_logs.import_settings("settings.json")
+ip = settings["kafka_config"]["api_ip"]
+response = requests.get(f"http://{ip}:8082/v3/clusters")
+print(response.status_code)
+data = response.json()
+print(json.dumps(data, indent=2))
+topic_url = data["data"][0]["topics"]["related"]
+response = requests.get(topic_url)
+print(response.status_code)
+data = response.json()
+print(json.dumps(data, indent=2))
+# if len(data["data"]) < 1:
+payload = {"topic_name": "my-logs-3", "partitions_count":3, "replication_factor":3}
+response = requests.post(topic_url, json=payload, headers={"Content-Type": "application/json"})
+print(response.status_code)
+print(json.dumps(response.json(), indent=2))
 
 run(v1)
 

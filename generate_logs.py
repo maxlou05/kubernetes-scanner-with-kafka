@@ -101,8 +101,10 @@ def upload_to_kafka(ip:str, topic:str):
     logs = json.load(open("logs.json", 'r'))
     payload = json.load(open("current_nfs.json", 'r'))
     payload["changes"] = logs
-    print(json.dumps(payload, indent=2))
-    response = requests.post(f"http://{ip}:8082/topics/{topic}", json={"records":[{"value":payload}]}, headers={"Content-Type": "application/vnd.kafka.json.v2+json"})
+    # print(json.dumps(payload, indent=2))
+    response = requests.get(f"http://{ip}:8082/topics/{topic}")
+    print(json.dumps(response.json(), indent=2))
+    response = requests.post(f"http://{ip}:8082/topics/{topic}", json={"records":[{"value":payload, "partition":0}]}, headers={"Content-Type": "application/vnd.kafka.json.v2+json"})
     return response
 
 

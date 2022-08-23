@@ -1,8 +1,6 @@
-/__pycache__
+__pycache__
 
-/.dockerignore
+test_namespaces.yml
 
-/test_namespaces.yml
-
-/*.json
-!/settings.json
+*.json
+!settings.json
