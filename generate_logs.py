@@ -1,9 +1,7 @@
 from datetime import datetime
 import json
 import os
-import requests
 import subprocess
-import time
 from typing import List
 
 
