@@ -17,4 +17,4 @@ Kowl can be used to visualize the data within the kafka cluster
 (needs to be installed separately using helm)
 
 1. Use the Kowl `kowl_values.yml` manifest to install Kowl with helm
-2. Port-forward port 8080 (as instructed after the install)
+2. `kubectl port-forward` port 8080 (as instructed after the install)
